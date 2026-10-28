@@ -91,6 +91,7 @@ export default function SettingsPage() {
   const [newKeyName, setNewKeyName] = useState("")
   const [newKeyUserId, setNewKeyUserId] = useState("")
   const [newKeyExpiration, setNewKeyExpiration] = useState("0")
+  const [newKeyOnBehalf, setNewKeyOnBehalf] = useState(false)
   const [generatedKey, setGeneratedKey] = useState<string | null>(null)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [isGeneratingKey, setIsGeneratingKey] = useState(false)
@@ -831,7 +832,8 @@ export default function SettingsPage() {
               body: JSON.stringify({
                   name: newKeyName,
                   userId: newKeyUserId || (session?.user as any)?.id,
-                  expiresInDays: parseInt(newKeyExpiration)
+                  expiresInDays: parseInt(newKeyExpiration),
+                  allowOnBehalf: newKeyOnBehalf
               })
           });
           const data = await res.json();
@@ -839,6 +841,7 @@ export default function SettingsPage() {
               setGeneratedKey(data.rawKey);
               setApiKeys([data.apiKey, ...apiKeys]);
               setNewKeyName("");
+              setNewKeyOnBehalf(false);
           } else {
               setGenerateError(data.error || "Failed to generate key");
           }
@@ -886,7 +889,7 @@ export default function SettingsPage() {
     configuredWebhooks, openWebhookModal, handleTestWebhook, testingWebhookId,
     toggleWebhookActive, deleteWebhook, toggleProviderEvent,
     users, apiKeys, newKeyName, setNewKeyName, newKeyUserId, setNewKeyUserId,
-    newKeyExpiration, setNewKeyExpiration, handleGenerateKey, isGeneratingKey,
+    newKeyExpiration, setNewKeyExpiration, newKeyOnBehalf, setNewKeyOnBehalf, handleGenerateKey, isGeneratingKey,
     generatedKey, setGeneratedKey, generateError, setGenerateError,
     handleRevokeKey, copyToClipboard,
     customHeaders, addHeader, updateHeader, removeHeader,

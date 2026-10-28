@@ -23,6 +23,7 @@ export async function GET() {
                 prefix: true,
                 lastUsedAt: true,
                 expiresAt: true,
+                allowOnBehalf: true,
                 createdAt: true,
                 // Nested select replaces include
                 user: { select: { username: true, role: true } },
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
     if (session?.user?.role !== 'ADMIN') return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     try {
-        const { name, userId, expiresInDays } = await request.json();
+        const { name, userId, expiresInDays, allowOnBehalf } = await request.json();
         if (!name || !userId) return NextResponse.json({ error: "Name and User are required" }, { status: 400 });
 
         // Generate a secure 32-byte hex string
@@ -68,7 +69,8 @@ export async function POST(request: Request) {
                 prefix,
                 userId,
                 createdById: (session.user as any).id,
-                expiresAt
+                expiresAt,
+                allowOnBehalf: allowOnBehalf === true
             },
             include: {
                 user: { select: { username: true, role: true } },
@@ -76,7 +78,7 @@ export async function POST(request: Request) {
             }
         });
 
-        await AuditLogger.log('CREATED_ADMIN_API_KEY', { keyName: name, assignedTo: apiKey.user.username }, (session.user as any).id);
+        await AuditLogger.log('CREATED_ADMIN_API_KEY', { keyName: name, assignedTo: apiKey.user.username, allowOnBehalf: apiKey.allowOnBehalf }, (session.user as any).id);
         
         // Strip keyHash out before sending to the client
         const { keyHash: _, ...safeKey } = apiKey;

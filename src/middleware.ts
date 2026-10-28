@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { Logger } from '@/lib/logger'
 import { isInactivityExpired } from '@/lib/session-timeout'
+import { wantsOnBehalf } from '@/lib/on-behalf'
 export async function middleware(req: NextRequest) {
   const token = await getToken({ req })
   // A token flagged { error: "SessionExpired" } by the jwt callback is still a truthy object, and
@@ -37,7 +38,10 @@ export async function middleware(req: NextRequest) {
         '/api/internal'       // Rust engine callbacks (notify/log) auth via X-Internal-Secret (no NextAuth cookie); each handler self-validates (issue #178)
     ];
     
-    const isPublicApi = publicApiRoutes.some(route => pathname.startsWith(route));
+    // On-behalf calls (src/lib/on-behalf.ts) carry an API key and a member, not a session: only the exact search and
+    // request routes, only GET and POST, and the route handler validates both before doing anything.
+    const isPublicApi = publicApiRoutes.some(route => pathname.startsWith(route))
+        || wantsOnBehalf(pathname, req.method, req.headers);
 
     // If it's a private API and the user has no token, block them instantly
     if (!isAuth && !isPublicApi) {

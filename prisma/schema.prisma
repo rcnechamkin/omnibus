@@ -75,6 +75,8 @@ model ApiKey {
   
   lastUsedAt  DateTime?
   expiresAt   DateTime?
+  // Lets this key act for a named non-admin member on /api/search and /api/request (src/lib/on-behalf.ts).
+  allowOnBehalf Boolean @default(false)
   createdAt   DateTime  @default(now())
 
   @@index([userId])

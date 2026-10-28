@@ -10,10 +10,16 @@ import { getErrorMessage } from '@/lib/utils/error';
 import { MetronProvider } from '@/lib/metadata/providers/metron';
 import { logApiUsage } from '@/lib/utils/system-flags';
 import { cachedCvGet } from '@/lib/metadata/metadata-cache';
+import { resolveOnBehalf, wantsOnBehalf } from '@/lib/on-behalf';
 
 const BASE_URL = 'https://comicvine.gamespot.com/api';
 
 export async function GET(request: Request) {
+  // A session passed the middleware; an on-behalf call is checked here (the middleware let it through unchecked).
+  if (wantsOnBehalf(new URL(request.url).pathname, request.method, request.headers)
+      && !(await resolveOnBehalf(request, 'search'))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   const { searchParams } = new URL(request.url);
   const rawQuery = searchParams.get('q');
   let provider = searchParams.get('provider');

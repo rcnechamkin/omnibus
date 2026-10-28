@@ -20,11 +20,20 @@ import { normalizeFractionNumbers } from '@/lib/utils/issue-parser';
 import { omnibusQueue } from '@/lib/queue';
 import { cachedCvGet } from '@/lib/metadata/metadata-cache';
 import { followSeries, followSeriesByCatalogId } from '@/lib/follows';
+import { resolveOnBehalf, wantsOnBehalf } from '@/lib/on-behalf';
 
 export const dynamic = 'force-dynamic';
 
+/** The session, or for an on-behalf call ONLY the named member (a cookie sent alongside is ignored). */
+async function requester(request: NextRequest, action: string): Promise<any> {
+  if (wantsOnBehalf(request.nextUrl.pathname, request.method, request.headers)) {
+    return resolveOnBehalf(request, action);
+  }
+  return getToken({ req: request });
+}
+
 export async function GET(request: NextRequest) {
-  const token = await getToken({ req: request });
+  const token = await requester(request, 'list requests');
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const userId = (token.id || token.sub) as string;
@@ -101,7 +110,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const token = await getToken({ req: request });
+  const token = await requester(request, 'request');
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const userId = (token.id || token.sub) as string;

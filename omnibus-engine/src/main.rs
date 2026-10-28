@@ -22,6 +22,7 @@ mod download;
 mod log_forward;
 mod renamer;
 mod secret_crypto;
+mod redact;
 
 use axum::{routing::{get, post}, Router, Json, extract::{State, Request}, http::{StatusCode, header}, middleware::{self, Next}, response::Response};
 use serde::{Deserialize, Serialize};
@@ -574,6 +575,8 @@ async fn write_failed_joblog(db: &db::Db, job_type: &str, duration_ms: i32, mess
 /// Records a JobLog row via the per-dialect "now" expression (src/db.rs). All handler success/
 /// failure logging funnels through here so the dialect handling lives in one place.
 async fn write_joblog(db: &db::Db, job_type: &str, status: &str, duration_ms: i32, message: String) {
+    // Provider errors carry the request URL, and ComicVine's URL carries the API key: never store it.
+    let message = redact::secrets(&message);
     if let Err(e) = sqlx::query(&format!(
         r#"INSERT INTO "JobLog" (id, "jobType", status, "durationMs", message, "createdAt", attempts)
            VALUES ($1, $2, $3, $4, $5, {now}, 1)"#,
@@ -1689,7 +1692,7 @@ async fn handle_discover_sync(State(state): State<Arc<AppState>>) -> StatusCode 
                 write_joblog(&db, "DISCOVER_SYNC", "COMPLETED", duration, details).await;
             },
             Err(e) => {
-                log::error!("❌ Background Discover Sync failed: {:?}", e);
+                log::error!("❌ Background Discover Sync failed: {}", redact::secrets(&format!("{:?}", e)));
                 write_failed_joblog(&db, "DISCOVER_SYNC", start_time.elapsed().as_millis() as i32, format!("Discover sync failed: {:?}", e)).await;
             },
         }

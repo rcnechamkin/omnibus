@@ -19,7 +19,7 @@ import type { SettingsBag } from "./shared"
 export function AccessSecurityTab({ s }: { s: SettingsBag }) {
   const {
     config, setConfig, users, apiKeys, newKeyName, setNewKeyName, newKeyUserId, setNewKeyUserId,
-    newKeyExpiration, setNewKeyExpiration, handleGenerateKey, isGeneratingKey,
+    newKeyExpiration, setNewKeyExpiration, newKeyOnBehalf, setNewKeyOnBehalf, handleGenerateKey, isGeneratingKey,
     generatedKey, setGeneratedKey, generateError, setGenerateError,
     handleRevokeKey, copyToClipboard, customHeaders, addHeader, updateHeader, removeHeader
   } = s;
@@ -163,7 +163,11 @@ export function AccessSecurityTab({ s }: { s: SettingsBag }) {
                             </Select>
                         </div>
                     </div>
-                    
+                    <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <input type="checkbox" className="mt-1" checked={!!newKeyOnBehalf} onChange={e => setNewKeyOnBehalf(e.target.checked)} />
+                        <span><span className="font-semibold text-foreground">Allow requests on behalf of members.</span> For a trusted front end: with an <code>X-Omnibus-User</code> header this key may search and request as that member (never as an admin). Their own Request permission and approval rules still apply.</span>
+                    </label>
+
                     <Button onClick={handleGenerateKey} disabled={!newKeyName || isGeneratingKey} className="font-bold h-10 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
                         {isGeneratingKey ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />} Generate New Key
                     </Button>

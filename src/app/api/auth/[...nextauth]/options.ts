@@ -9,6 +9,7 @@ import crypto from "crypto";
 import { Logger } from "@/lib/logger";
 import { grantAllLibraries, setUserLibraryAccess, getDefaultLibraryIds } from "@/lib/library-access";
 import { isInactivityExpired } from "@/lib/session-timeout";
+import { ssoUsername } from "@/lib/sso-username";
 
 // --- SECURITY SAFEGUARD ---
 const defaultSecret = 'change_this_to_a_random_secure_string_123!';
@@ -127,6 +128,8 @@ export async function getAuthOptions(): Promise<NextAuthOptions> {
         return {
           id: profile.sub, 
           name: profile.name || profile.preferred_username || profile.nickname || profile.email?.split('@')[0] || "SSO User", 
+          // Avrana fork: the identity provider's username names a new account (src/lib/sso-username.ts)
+          preferredUsername: typeof profile.preferred_username === 'string' ? profile.preferred_username : null,
           email: profile.email,
           groups: profile.groups || profile.roles || [] 
         };
@@ -175,7 +178,12 @@ export async function getAuthOptions(): Promise<NextAuthOptions> {
           if (!dbUser) {
             dbUser = await prisma.user.create({ 
               data: { 
-                username: user.name || user.email.split('@')[0], 
+                username: await ssoUsername(
+                  { preferredUsername: (user as any).preferredUsername, email: user.email, name: user.name },
+                  async (name) => {
+                    const rows: any[] = await prisma.$queryRaw`SELECT 1 FROM "User" WHERE LOWER(username) = ${name.toLowerCase()} LIMIT 1`;
+                    return rows.length > 0;
+                  }),
                 email: user.email, 
                 password: '', 
                 role: targetRole,

@@ -10,10 +10,10 @@
 import crypto from 'crypto';
 import { prisma } from './db';
 import { Logger } from './logger';
+import { MEMBER_USERNAME } from './member-username';
 
 export const ON_BEHALF_ROUTES = ['/api/search', '/api/request'] as const;
 export const ON_BEHALF_METHODS = ['GET', 'POST'] as const;
-const USERNAME = /^[A-Za-z0-9._@+-]{1,150}$/;
 
 export interface OnBehalfToken {
     id: string;
@@ -38,7 +38,7 @@ export function wantsOnBehalf(pathname: string, method: string, headers: Headers
 export async function resolveOnBehalf(req: Request, action: string): Promise<OnBehalfToken | null> {
     const raw = req.headers.get('x-api-key')?.trim();
     const username = req.headers.get('x-omnibus-user')?.trim();
-    if (!raw || !username || !USERNAME.test(username)) return null;
+    if (!raw || !username || !MEMBER_USERNAME.test(username)) return null;
     try {
         const keyHash = crypto.createHash('sha256').update(raw).digest('hex');
         const key = await prisma.apiKey.findUnique({ where: { keyHash }, include: { createdBy: true } });

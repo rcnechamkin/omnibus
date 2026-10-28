@@ -73,6 +73,28 @@ describe('Security: NextAuth OIDC Single Sign-On', () => {
         }));
     });
 
+    it('Avrana fork: names a new SSO account after preferred_username, not the display name', async () => {
+        mocks.systemSettingFindMany.mockResolvedValue([
+            { key: 'oidc_enabled', value: 'true' },
+            { key: 'oidc_auto_approve', value: 'true' }
+        ]);
+        mocks.queryRaw.mockResolvedValue([]);           // no account with this e-mail, and every name is free
+        mocks.userCreate.mockClear();
+        mocks.userCreate.mockResolvedValue({ id: 'user_2', role: 'USER', isApproved: true });
+        mocks.userFindFirst.mockResolvedValue(null);
+
+        const options = await getAuthOptions();
+        const result = await (options.callbacks!.signIn as any)({
+            user: { email: 'jane@sso.com', name: 'Jane Doe', preferredUsername: 'jane_doe' },
+            account: { provider: 'oidc' }
+        });
+
+        expect(result).toBe(true);
+        expect(mocks.userCreate).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ username: 'jane_doe', email: 'jane@sso.com' })
+        }));
+    });
+
     it('should assign ADMIN role and auto-approve if user belongs to the mapped admin group', async () => {
         // Simulate DB settings: Groups are mapped
         mocks.systemSettingFindMany.mockResolvedValue([

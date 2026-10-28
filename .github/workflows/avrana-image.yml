@@ -1,0 +1,70 @@
+# Avrana fork: test, then build both images from an avrana/* branch.
+# Images: ghcr.io/<owner>/omnibus and ghcr.io/<owner>/omnibus-engine, tagged <branch>-<sha7> (linux/amd64, the avrana
+# host). Deploys pin them BY DIGEST, which the build writes to the run summary. Upstream branches are untouched.
+name: Avrana image
+
+on:
+  push:
+    branches: ["avrana/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - run: npx prisma generate
+      - run: npx vitest run
+      - name: Engine tests
+        working-directory: omnibus-engine
+        run: cargo test --locked
+
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: omnibus
+            context: .
+          - name: omnibus-engine
+            context: ./omnibus-engine
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: tag
+        run: |
+          safe=$(printf '%s' "$GITHUB_REF_NAME" | tr '/' '-' | tr -cd 'A-Za-z0-9._-')
+          echo "tag=${safe}-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/$(echo "$GITHUB_REPOSITORY_OWNER" | tr 'A-Z' 'a-z')/${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: ${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+      - name: Digest
+        run: |
+          echo "### ${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '`${{ steps.tag.outputs.image }}@${{ steps.build.outputs.digest }}`' >> "$GITHUB_STEP_SUMMARY"

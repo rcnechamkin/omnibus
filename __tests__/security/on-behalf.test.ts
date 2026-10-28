@@ -79,8 +79,8 @@ describe('On-behalf API keys', () => {
             [KEY, MEMBER, 'bad name with spaces'],
         ];
         for (const [key, member, username] of cases) {
-            mocks.apiKeyFindUnique.mockResolvedValueOnce(key);
-            mocks.userFindUnique.mockResolvedValueOnce(member);
+            mocks.apiKeyFindUnique.mockResolvedValue(key);
+            mocks.userFindUnique.mockResolvedValue(member);
             const who = await resolveOnBehalf(req('/api/search', 'GET', { 'x-api-key': RAW, 'x-omnibus-user': username }), 'search');
             expect(who).toBeNull();
         }

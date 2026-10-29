@@ -55,6 +55,36 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Build and load locally first, so the web image can be smoke-run before anything is pushed.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          platforms: linux/amd64
+          load: true
+          push: false
+          provenance: false
+          tags: ${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+      # The web image must serve pages, not only build: 2026-10-29 an image whose Edge middleware imported Prisma
+      # passed every unit test and answered 500 on every page in production. Fresh SQLite database, no secrets.
+      - name: Smoke-run the web image
+        if: matrix.name == 'omnibus'
+        env:
+          IMAGE: ${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/config" && chmod 777 "$RUNNER_TEMP/config"
+          docker run -d --name smoke -p 3000:3000 -v "$RUNNER_TEMP/config:/config"             -e DATABASE_URL=file:/config/omnibus.db -e NEXTAUTH_URL=http://localhost:3000             -e NEXTAUTH_SECRET="$(openssl rand -hex 32)" -e OMNIBUS_CACHE_DIR=/config/cache             -e OMNIBUS_LOGS_DIR=/config/logs -e OMNIBUS_BACKUPS_DIR=/config/backups "$IMAGE"
+          code=000
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/ || true)
+            [ "$code" != 000 ] && break; sleep 2
+          done
+          behalf=$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Api-Key: smoke' -H 'X-Omnibus-User: smoke'             'http://localhost:3000/api/search?query=x' || true)
+          echo "page=$code on-behalf=$behalf"
+          docker logs smoke 2>&1 | tail -20
+          case "$code" in 2*|3*) ;; *) echo "::error::the home page answered $code"; exit 1;; esac
+          case "$behalf" in 401|403) ;; *) echo "::error::an unknown on-behalf key answered $behalf, not 401/403"; exit 1;; esac
+          if docker logs smoke 2>&1 | grep -q 'Edge Runtime'; then echo "::error::Prisma in the Edge runtime"; exit 1; fi
       - id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:

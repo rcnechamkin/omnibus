@@ -12,8 +12,9 @@ import { prisma } from './db';
 import { Logger } from './logger';
 import { MEMBER_USERNAME } from './member-username';
 
-export const ON_BEHALF_ROUTES = ['/api/search', '/api/request'] as const;
-export const ON_BEHALF_METHODS = ['GET', 'POST'] as const;
+import { ON_BEHALF_METHODS, ON_BEHALF_ROUTES, wantsOnBehalf } from './on-behalf-gate';
+
+export { ON_BEHALF_METHODS, ON_BEHALF_ROUTES, wantsOnBehalf };   // the middleware imports them from on-behalf-gate
 
 export interface OnBehalfToken {
     id: string;
@@ -21,14 +22,6 @@ export interface OnBehalfToken {
     name: string;
     role: 'USER';
     onBehalfKeyId: string;
-}
-
-/** True when the request carries on-behalf headers for a route and method that accept them (middleware gate). */
-export function wantsOnBehalf(pathname: string, method: string, headers: Headers): boolean {
-    return (ON_BEHALF_ROUTES as readonly string[]).includes(pathname)
-        && (ON_BEHALF_METHODS as readonly string[]).includes(method.toUpperCase())
-        && !!headers.get('x-api-key')
-        && !!headers.get('x-omnibus-user');
 }
 
 /**

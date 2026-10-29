@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { Logger } from '@/lib/logger'
 import { isInactivityExpired } from '@/lib/session-timeout'
-import { wantsOnBehalf } from '@/lib/on-behalf'
+import { wantsOnBehalf } from '@/lib/on-behalf-gate'
 export async function middleware(req: NextRequest) {
   const token = await getToken({ req })
   // A token flagged { error: "SessionExpired" } by the jwt callback is still a truthy object, and
